@@ -1,0 +1,204 @@
+#!/bin/sh
+#| -*- mode: lisp; -*-
+## Copyright (C) 2020 Pierre Neidhardt <mail@ambrevar.xyz>
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+XDG_CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache/}
+LISP_REPL_CORE_PATH=${LISP_REPL_CORE_PATH:-$XDG_CACHE_HOME/lisp-repl-core-directory/}
+
+usage () {
+	cat<<EOF>&2
+Usage: ${0##*/} LISP [SYSTEMS]
+
+Create a Lisp image with ASDF and SYSTEMS preloaded, then run LISP using this
+image.
+
+The image is only created for one of the following reasons:
+
+- If it does not exist.
+- If its version does not match LISP version.
+- If its preloaded systems do not match SYSTEMS.
+
+The image is stored in \$LISP_REPL_CORE_PATH ($LISP_REPL_CORE_PATH).
+EOF
+}
+
+[ $# -eq 0 ] && usage && exit 1
+
+## TODO: Makesure scriptpath is correct.
+scriptpath=$0
+lisp=$1
+lisp_basename=$(basename "$lisp")
+shift 1
+current_packages=$(echo "$@" | sed 's/ /\n/g' | sort | paste -sd ' ' -)
+
+core="$LISP_REPL_CORE_PATH"/$lisp_basename.image
+properties="$LISP_REPL_CORE_PATH"/$lisp_basename.properties
+if [ -f "$properties" ]; then
+	version=$(sed 1q "$properties")
+	packages=$(sed -n '2p;2q' "$properties")
+fi
+
+case "$lisp_basename" in
+sbcl)
+	lisp_flags="--noinform --no-userinit"
+	eval_flag=--eval
+	image_flag=--core
+	;;
+ccl)
+	lisp_flags=--no-init
+	eval_flag=--eval
+	image_flag=--image-name
+	;;
+clisp)
+	lisp_flags="-norc --quiet"
+	eval_flag=-x
+	image_flag=-M
+	;;
+	*)
+		echo >&2 "Unsupported '$lisp' implementation."
+		exit 2;;
+esac
+
+## TODO: Include tests here?
+
+## Wrap result with (progn ... (values)) because CLISP outputs `-x` evalutions
+## to stdout.
+current_version=$($lisp $lisp_flags $eval_flag '(progn (princ (lisp-implementation-version)) (values))' $eval_flag '(quit)')
+
+if [ ! -f "$core" ] || \
+		 [ ! "$version" = "$current_version" ] || \
+		 [ ! "$packages" = "$current_packages" ]
+then
+	case "$lisp_basename" in
+	sbcl)
+		$lisp $lisp_flags --script "$0" "$@"
+		;;
+	ccl)
+		## It seems that CCL cannot load files with shabangs and
+		##   (progn (read-line s) (load s))
+		## does not seem to work.
+		$lisp $lisp_flags $eval_flag \
+					"$(cat<<EOF
+(with-open-file (s "$0")
+  (read-line s)
+  (let ((file-string (format nil "~{~a~^~%~}"
+                             (loop for line = (read-line s nil :eof)
+                                   until (eq line :eof)
+                                   collect line))))
+    (with-input-from-string (s file-string)
+      (loop for object = (read s nil :eof)
+            until (eq object :eof)
+            do (eval object)))))
+EOF
+						)" -- "$@"
+		;;
+	clisp)
+		$lisp $lisp_flags "$0" -- "$@"
+		;;
+	esac
+fi
+
+if [ -f "$core" ]; then
+	exec $lisp $image_flag $core
+else
+	echo >&2 "Error generating image."
+	exit 1
+fi
+
+|#
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defpackage lisp-repl-core-dumper
+  (:use #:common-lisp))
+(in-package lisp-repl-core-dumper)
+
+(require "asdf")
+
+(defvar lisp-repl-core-directory (uiop:xdg-cache-home "lisp-repl-core-directory"))
+
+(defvar default-packages
+  (append
+   #+sbcl
+   '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2 )
+   '(asdf)))
+
+;; REVIEW: Get `implementation' from argv0?  For CLisp it's "lisp".
+;; BETTER: Pass it as first argument since it's decided by the shell.
+;; (lisp-implementation-type) of CCL is "Clozure Common Lisp".
+(defvar implementation
+  ;; (or (ignore-errors (pathname-name (first (uiop:raw-command-line-arguments))))
+  ;;                          (string-downcase (lisp-implementation-type)))
+  #-ccl
+  (string-downcase (lisp-implementation-type))
+  #+ccl
+  "ccl")
+
+(defvar extra-packages (uiop:command-line-arguments))
+
+(defun core-name (implementation)
+  (format nil "~a/~a.image"
+          lisp-repl-core-directory
+          implementation))
+
+(defun properties-name (implementation)
+  (format nil "~a/~a.properties"
+          lisp-repl-core-directory
+          implementation))
+
+(defun ensure-parent-exists (file)
+  (uiop:ensure-all-directories-exist
+   (list (directory-namestring file))))
+
+(ensure-parent-exists (properties-name implementation))
+(with-open-file (f (properties-name implementation)
+                   :direction :output :if-exists :supersede)
+  (format f "~a~%" (lisp-implementation-version))
+  (format f "~{~a~^ ~}~%" extra-packages))
+
+(mapc #'require default-packages)
+(mapc #'asdf:load-system extra-packages)
+
+(format *error-output* "Dumping ~s version ~s~a.~%"
+        (core-name implementation)
+        (lisp-implementation-version)
+        (if extra-packages
+            (format nil " with packages ~a" extra-packages)
+            ""))
+(finish-output *error-output*)
+(format t "~a~%" (core-name implementation))
+(finish-output)
+
+;; `*image-dump-hook*' is `(UIOP/CONFIGURATION:CLEAR-CONFIGURATION)' by
+;; default, which slows down startup.
+;; TODO: Make this customizable?
+(setf uiop:*image-dump-hook* nil)
+(ensure-parent-exists (core-name implementation))
+
+;; TODO: (delete-package lisp-repl-core-dumper)
+#-clisp
+(uiop:dump-image (core-name implementation))
+#+clisp
+(progn
+  ;; CLISP image saving is too verbose.
+  (funcall (read-from-string "uiop:call-with-null-output")
+           (lambda (null-output)
+             (let ((*standard-output* null-output))
+               (ext:saveinitmem (core-name implementation)
+                                :quiet t
+                                :start-package *package*
+                                :keep-global-handlers nil
+                                :executable nil))))
+  ;; CLISP does not quit after dumping an image.
+  (ext:quit 0))

@@ -1,0 +1,70 @@
+Do you fancy an instantly starting Common Lisp REPL?
+Even one that automatically includes your favourite libraries?
+
+This tool is for you!
+
+- It's portable and should work with any compiler.
+  If your compiler is not supported, please report.  (Or better, send a patch!)
+
+- It works for any REPL.
+
+- It allows you to include arbitrary libraries.
+
+Simply load the script with a supported Lisp and it will dump an image that
+preloads ASDF and the user-provided extra libraries.  You can then configure
+your REPL to use this image for an instant startup!
+
+* Tested compilers
+
+- Steel Bank Common Lisp (SBCL)
+- Clozure Common Lisp (CCL)
+- CLISP
+
+Some implementations such as Embedded Common Lisp (ECL) does not seem to support
+image dumping.
+
+* Emacs setup
+
+While this can be used with any editor, here is a configuration snippet for
+Emacs user to save them some typing.
+
+This configuration sample makes use of the ability to accept lambdas as Lisp
+implementation.  This way we call the dumper on each inferior Lisp startup.
+
+#+begin_src elisp
+  (let ((dumper "/path/to/lisp-repl-core-dumper"))
+    (setq sly-lisp-implementations
+          `((ccl (,dumper "ccl"))
+            (ccl-with-alex (,dumper "ccl" "alexandria"))
+            (clisp (,dumper "clisp"))
+            (sbcl (,dumper "sbcl")))))
+#+end_src
+
+or, if =lisp-repl-core-dumper= is in your path:
+
+#+begin_src elisp
+  (setq sly-lisp-implementations
+        `((ccl ("lisp-repl-core-dumper" "ccl"))
+          (ccl-with-alex (,dumper "ccl" "alexandria"))
+          (clisp ("lisp-repl-core-dumper" "clisp"))
+          (sbcl ("lisp-repl-core-dumper" "sbcl"))))
+#+end_src
+
+* Why isn't this an ASDF system?
+
+=(require "asdf")= takes too much time.
+
+The time spent checking for an up-to-date image adds further delay before
+the REPL is usable, so we want to make it the fastest possible.
+
+We could have programmed it fully in Lisp, but then we would have need a
+portable way to interact with files, run a program, etc.  Which would amount to
+loading UIOP or reimplementing it, which would be too slow.
+
+The POSIX shell code depends on standard Unix tools and does the image checking
+job in just a few lines.
+
+* References
+
+hu.dwim has a a similar, more sophisticated, but less general script:
+https://hub.darcs.net/hu.dwim/hu.dwim.environment/browse/bin/build-development-image.sh
