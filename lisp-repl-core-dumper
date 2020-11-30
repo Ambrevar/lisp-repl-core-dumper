@@ -84,7 +84,7 @@ if [ ! -f "$core" ] || \
 then
 	case "$lisp_basename" in
 	sbcl)
-		$lisp $lisp_flags --script "$0" "$@"
+		$lisp $lisp_flags --script "$0" "$core" "$@"
 		;;
 	ccl)
 		## It seems that CCL cannot load files with shabangs and
@@ -103,10 +103,10 @@ then
             until (eq object :eof)
             do (eval object)))))
 EOF
-						)" -- "$@"
+						)" -- "$core" "$@"
 		;;
 	clisp)
-		$lisp $lisp_flags "$0" -- "$@"
+		$lisp $lisp_flags "$0" -- "$core" "$@"
 		;;
 	esac
 fi
@@ -134,18 +134,9 @@ fi
    '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2 )
    '(asdf)))
 
-;; REVIEW: Get `implementation' from argv0?  For CLisp it's "lisp".
-;; BETTER: Pass it as first argument since it's decided by the shell.
-;; (lisp-implementation-type) of CCL is "Clozure Common Lisp".
-(defvar implementation
-  ;; (or (ignore-errors (pathname-name (first (uiop:raw-command-line-arguments))))
-  ;;                          (string-downcase (lisp-implementation-type)))
-  #-ccl
-  (string-downcase (lisp-implementation-type))
-  #+ccl
-  "ccl")
+(defvar implementation (pathname-name (first (uiop:command-line-arguments))))
 
-(defvar extra-packages (uiop:command-line-arguments))
+(defvar extra-packages (rest (uiop:command-line-arguments)))
 
 (defun core-name (implementation)
   (format nil "~a/~a.image"
