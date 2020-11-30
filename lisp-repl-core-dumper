@@ -37,7 +37,6 @@ EOF
 
 [ $# -eq 0 ] && usage && exit 1
 
-## TODO: Makesure scriptpath is correct.
 scriptpath=$0
 lisp=$1
 lisp_basename=$(basename "$lisp")
@@ -84,7 +83,7 @@ if [ ! -f "$core" ] || \
 then
 	case "$lisp_basename" in
 	sbcl)
-		$lisp $lisp_flags --script "$0" "$core" "$@"
+		$lisp $lisp_flags --script "$scriptpath" "$core" "$@"
 		;;
 	ccl)
 		## It seems that CCL cannot load files with shabangs and
@@ -92,7 +91,7 @@ then
 		## does not seem to work.
 		$lisp $lisp_flags $eval_flag \
 					"$(cat<<EOF
-(with-open-file (s "$0")
+(with-open-file (s "$scriptpath")
   (read-line s)
   (let ((file-string (format nil "~{~a~^~%~}"
                              (loop for line = (read-line s nil :eof)
@@ -106,7 +105,7 @@ EOF
 						)" -- "$core" "$@"
 		;;
 	clisp)
-		$lisp $lisp_flags "$0" -- "$core" "$@"
+		$lisp $lisp_flags "$scriptpath" -- "$core" "$@"
 		;;
 	esac
 fi
