@@ -50,7 +50,9 @@ or, if =lisp-repl-core-dumper= is in your path:
           (sbcl ("lisp-repl-core-dumper" "sbcl"))))
 #+end_src
 
-* Why isn't this an ASDF system?
+* Implementation notes
+
+** Why isn't this an ASDF system?
 
 =(require "asdf")= takes too much time.
 
@@ -63,6 +65,13 @@ loading UIOP or reimplementing it, which would be too slow.
 
 The POSIX shell code depends on standard Unix tools and does the image checking
 job in just a few lines.
+
+** Why hashing the binary?
+
+Some implementations like SBCL refuse to load a core that wasn't created with
+the exact same compiler.  Since it's possible to have different compilers with
+the same version (e.g. when compiling them with different flags), checking
+against the version is not enough.
 
 * References
 

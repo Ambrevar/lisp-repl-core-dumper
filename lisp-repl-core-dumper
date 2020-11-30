@@ -28,7 +28,7 @@ image.
 The image is only created for one of the following reasons:
 
 - If it does not exist.
-- If its version does not match LISP version.
+- If its version or hash does not match LISP version.
 - If its preloaded systems do not match SYSTEMS.
 
 The image is stored in \$LISP_REPL_CORE_PATH ($LISP_REPL_CORE_PATH).
@@ -41,14 +41,9 @@ scriptpath=$0
 lisp=$1
 lisp_basename=$(basename "$lisp")
 shift 1
-current_packages=$(echo "$@" | sed 's/ /\n/g' | sort | paste -sd ' ' -)
-
-core="$LISP_REPL_CORE_PATH"/$lisp_basename.image
-properties="$LISP_REPL_CORE_PATH"/$lisp_basename.properties
-if [ -f "$properties" ]; then
-	version=$(sed 1q "$properties")
-	packages=$(sed -n '2p;2q' "$properties")
-fi
+packages=$(echo "$@" | sed 's/ /\n/g' | sort | paste -sd '+' -)
+[ -n "$packages" ] && packages=-"$packages"
+lisp_hash=$(sha1sum $(which "$lisp") | cut -f1 -d' ')
 
 case "$lisp_basename" in
 sbcl)
@@ -73,14 +68,13 @@ esac
 
 ## TODO: Include tests here?
 
+
 ## Wrap result with (progn ... (values)) because CLISP outputs `-x` evalutions
 ## to stdout.
-current_version=$($lisp $lisp_flags $eval_flag '(progn (princ (lisp-implementation-version)) (values))' $eval_flag '(quit)')
+version=$("$lisp" $lisp_flags $eval_flag '(progn (princ (lisp-implementation-version)) (values))' $eval_flag '(quit)')
+core="$LISP_REPL_CORE_PATH"/$lisp_basename-$version-$lisp_hash$packages.image
 
-if [ ! -f "$core" ] || \
-		 [ ! "$version" = "$current_version" ] || \
-		 [ ! "$packages" = "$current_packages" ]
-then
+if [ ! -f "$core" ]; then
 	case "$lisp_basename" in
 	sbcl)
 		$lisp $lisp_flags --script "$scriptpath" "$core" "$@"
@@ -125,67 +119,49 @@ fi
 
 (require "asdf")
 
-(defvar lisp-repl-core-directory (uiop:xdg-cache-home "lisp-repl-core-directory"))
-
 (defvar default-packages
   (append
    #+sbcl
    '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2 )
    '(asdf)))
 
-(defvar implementation (pathname-name (first (uiop:command-line-arguments))))
+(defvar core (first (uiop:command-line-arguments)))
 
 (defvar extra-packages (rest (uiop:command-line-arguments)))
-
-(defun core-name (implementation)
-  (format nil "~a/~a.image"
-          lisp-repl-core-directory
-          implementation))
-
-(defun properties-name (implementation)
-  (format nil "~a/~a.properties"
-          lisp-repl-core-directory
-          implementation))
 
 (defun ensure-parent-exists (file)
   (uiop:ensure-all-directories-exist
    (list (directory-namestring file))))
 
-(ensure-parent-exists (properties-name implementation))
-(with-open-file (f (properties-name implementation)
-                   :direction :output :if-exists :supersede)
-  (format f "~a~%" (lisp-implementation-version))
-  (format f "~{~a~^ ~}~%" extra-packages))
-
 (mapc #'require default-packages)
 (mapc #'asdf:load-system extra-packages)
 
 (format *error-output* "Dumping ~s version ~s~a.~%"
-        (core-name implementation)
+        core
         (lisp-implementation-version)
         (if extra-packages
             (format nil " with packages ~a" extra-packages)
             ""))
 (finish-output *error-output*)
-(format t "~a~%" (core-name implementation))
+(format t "~a~%" core)
 (finish-output)
 
 ;; `*image-dump-hook*' is `(UIOP/CONFIGURATION:CLEAR-CONFIGURATION)' by
 ;; default, which slows down startup.
 ;; TODO: Make this customizable?
 (setf uiop:*image-dump-hook* nil)
-(ensure-parent-exists (core-name implementation))
+(ensure-parent-exists core)
 
 ;; TODO: (delete-package lisp-repl-core-dumper)
 #-clisp
-(uiop:dump-image (core-name implementation))
+(uiop:dump-image core)
 #+clisp
 (progn
   ;; CLISP image saving is too verbose.
   (funcall (read-from-string "uiop:call-with-null-output")
            (lambda (null-output)
              (let ((*standard-output* null-output))
-               (ext:saveinitmem (core-name implementation)
+               (ext:saveinitmem core
                                 :quiet t
                                 :start-package *package*
                                 :keep-global-handlers nil
