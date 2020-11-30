@@ -105,7 +105,7 @@ EOF
 fi
 
 if [ -f "$core" ]; then
-	exec $lisp $image_flag $core
+	exec $lisp $image_flag "$core"
 else
 	echo >&2 "Error generating image."
 	exit 1
