@@ -152,19 +152,21 @@ fi
 (setf uiop:*image-dump-hook* nil)
 (ensure-parent-exists core)
 
-;; TODO: (delete-package lisp-repl-core-dumper)
-#-clisp
-(uiop:dump-image core)
-#+clisp
-(progn
-  ;; CLISP image saving is too verbose.
-  (funcall (read-from-string "uiop:call-with-null-output")
-           (lambda (null-output)
-             (let ((*standard-output* null-output))
-               (ext:saveinitmem core
-                                :quiet t
-                                :start-package *package*
-                                :keep-global-handlers nil
-                                :executable nil))))
-  ;; CLISP does not quit after dumping an image.
-  (ext:quit 0))
+(in-package cl-user)
+(let ((core lisp-repl-core-dumper::core))
+  (delete-package :lisp-repl-core-dumper)
+  #-clisp
+  (uiop:dump-image core)
+  #+clisp
+  (progn
+    ;; CLISP image saving is too verbose.
+    (funcall (read-from-string "uiop:call-with-null-output")
+             (lambda (null-output)
+               (let ((*standard-output* null-output))
+                 (ext:saveinitmem core
+                                  :quiet t
+                                  :start-package *package*
+                                  :keep-global-handlers nil
+                                  :executable nil))))
+    ;; CLISP does not quit after dumping an image.
+    (ext:quit 0)))
