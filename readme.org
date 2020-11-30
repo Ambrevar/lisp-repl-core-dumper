@@ -45,7 +45,7 @@ or, if =lisp-repl-core-dumper= is in your path:
 #+begin_src elisp
   (setq sly-lisp-implementations
         `((ccl ("lisp-repl-core-dumper" "ccl"))
-          (ccl-with-alex (,dumper "ccl" "alexandria"))
+          (ccl-with-alex ("lisp-repl-core-dumper" "ccl" "alexandria"))
           (clisp ("lisp-repl-core-dumper" "clisp"))
           (sbcl ("lisp-repl-core-dumper" "sbcl"))))
 #+end_src
