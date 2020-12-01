@@ -14,6 +14,27 @@ Simply load the script with a supported Lisp and it will dump an image that
 preloads ASDF and the user-provided extra libraries.  You can then configure
 your REPL to use this image for an instant startup!
 
+* Installation
+
+It's a stand-alone, portable script: just download and run it!
+
+You may want to install it in your =PATH= for convenience.
+
+It's also available as a Guix package.
+
+* Usage
+
+See =lisp-repl-core-dumper -h=.
+
+Example use:
+
+#+begin_src sh
+lisp-repl-core-dumper sbcl alexandria serapeum
+#+end_src
+
+will generate an image (if necessary), including Alexandria and Serapeum, then
+drop you in the resulting REPL.
+
 * Tested compilers
 
 - Steel Bank Common Lisp (SBCL)
