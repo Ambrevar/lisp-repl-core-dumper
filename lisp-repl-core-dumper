@@ -115,13 +115,13 @@ gencore () {
 	$opt_clear_asdf && export LISP_REPL_CLEAR_ASDF=true
 	case "$lisp_basename" in
 	sbcl)
-		$lisp $lisp_flags --script "$scriptpath" "$core" "$@"
+		$lisp --script "$scriptpath" "$core" "$@"
 		;;
 	ccl)
 		## It seems that CCL cannot load files with shabangs and
 		##   (progn (read-line s) (load s))
 		## does not seem to work.
-		$lisp $lisp_flags $eval_flag \
+		$lisp $eval_flag \
 					"$(cat<<EOF
 (with-open-file (s "$scriptpath")
   (read-line s)
@@ -137,7 +137,7 @@ EOF
 						)" -- "$core" "$@"
 		;;
 	clisp)
-		$lisp $lisp_flags "$scriptpath" -- "$core" "$@"
+		$lisp "$scriptpath" -- "$core" "$@"
 		;;
 	esac
 }
