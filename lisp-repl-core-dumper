@@ -15,7 +15,7 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-## Version 0.0.0.
+version="0.0.0"
 
 XDG_CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache/}
 LISP_REPL_CORE_PATH=${LISP_REPL_CORE_PATH:-$XDG_CACHE_HOME/lisp-repl-core-directory/}
@@ -31,16 +31,49 @@ Usage: ${0##*/} LISP [SYSTEMS]
 Create a Lisp image with ASDF and SYSTEMS preloaded, then run LISP using this
 image.
 
+Options:
+
+  -c: Clear ASDF configuration on image load.  This slows down startup a little
+      but without it you'd have to run '(asdf:clear-configuration)' to reflect
+      changes made after the image generation.
+
+  -f: Force rebuild the image.  This is useful for instance if you've updated
+      the systems.
+
+  -v: Show version and exit.
+
 The image is only created for one of the following reasons:
 
 - If it does not exist.
 - If its version does not match LISP version.
 - If its preloaded systems do not match SYSTEMS.
 
-The image is stored in \$LISP_REPL_CORE_PATH ($LISP_REPL_CORE_PATH).
+The image is stored in \$LISP_REPL_CORE_PATH
+($LISP_REPL_CORE_PATH).
 EOF
 }
 
+opt_force=false
+opt_clear_asdf=false
+while getopts ":chfv" opt; do
+	case $opt in
+	c)
+		opt_clear_asdf=true ;;
+	h)
+		usage
+		exit 0 ;;
+	f)
+		opt_force=true ;;
+	v)
+		echo $version
+		exit 0 ;;
+	\?)
+		usage
+		exit 1 ;;
+	esac
+done
+
+shift $(($OPTIND - 1))
 [ $# -eq 0 ] && usage && exit $error_args
 
 scriptpath=$0
@@ -79,6 +112,7 @@ version=$("$lisp" $lisp_flags $eval_flag '(progn (princ (lisp-implementation-ver
 core="$LISP_REPL_CORE_PATH"/$lisp_basename-$version$packages.image
 
 gencore () {
+	$opt_clear_asdf && export LISP_REPL_CLEAR_ASDF=true
 	case "$lisp_basename" in
 	sbcl)
 		$lisp $lisp_flags --script "$scriptpath" "$core" "$@"
@@ -108,7 +142,7 @@ EOF
 	esac
 }
 
-if [ ! -f "$core" ]; then
+if $opt_force || [ ! -f "$core" ]; then
 	gencore "$@"
 fi
 
@@ -167,8 +201,8 @@ fi
 
 ;; `*image-dump-hook*' is `(UIOP/CONFIGURATION:CLEAR-CONFIGURATION)' by
 ;; default, which slows down startup.
-;; TODO: Make this customizable?
-(setf uiop:*image-dump-hook* nil)
+(unless (uiop:getenv "LISP_REPL_CLEAR_ASDF")
+  (setf uiop:*image-dump-hook* nil))
 (ensure-parent-exists core)
 
 (in-package cl-user)
