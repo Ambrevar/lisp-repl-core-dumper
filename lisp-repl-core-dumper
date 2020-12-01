@@ -20,6 +20,10 @@
 XDG_CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache/}
 LISP_REPL_CORE_PATH=${LISP_REPL_CORE_PATH:-$XDG_CACHE_HOME/lisp-repl-core-directory/}
 
+error_args=1
+error_unsupported_lisp=2
+error_generation=3
+
 usage () {
 	cat<<EOF>&2
 Usage: ${0##*/} LISP [SYSTEMS]
@@ -30,14 +34,14 @@ image.
 The image is only created for one of the following reasons:
 
 - If it does not exist.
-- If its version or hash does not match LISP version.
+- If its version does not match LISP version.
 - If its preloaded systems do not match SYSTEMS.
 
 The image is stored in \$LISP_REPL_CORE_PATH ($LISP_REPL_CORE_PATH).
 EOF
 }
 
-[ $# -eq 0 ] && usage && exit 1
+[ $# -eq 0 ] && usage && exit $error_args
 
 scriptpath=$0
 lisp=$1
@@ -45,7 +49,6 @@ lisp_basename=$(basename "$lisp")
 shift 1
 packages=$(echo "$@" | sed 's/ /\n/g' | sort | paste -sd '+' -)
 [ -n "$packages" ] && packages=-"$packages"
-lisp_hash=$(sha1sum $(which "$lisp") | cut -f1 -d' ')
 
 case "$lisp_basename" in
 sbcl)
@@ -65,7 +68,7 @@ clisp)
 	;;
 	*)
 		echo >&2 "Unsupported '$lisp' implementation."
-		exit 2;;
+		exit $error_unsupported_lisp;;
 esac
 
 ## TODO: Include tests here?
@@ -73,9 +76,9 @@ esac
 ## Wrap result with (progn ... (values)) because CLISP outputs `-x` evalutions
 ## to stdout.
 version=$("$lisp" $lisp_flags $eval_flag '(progn (princ (lisp-implementation-version)) (values))' $eval_flag '(quit)')
-core="$LISP_REPL_CORE_PATH"/$lisp_basename-$version-$lisp_hash$packages.image
+core="$LISP_REPL_CORE_PATH"/$lisp_basename-$version$packages.image
 
-if [ ! -f "$core" ]; then
+gencore () {
 	case "$lisp_basename" in
 	sbcl)
 		$lisp $lisp_flags --script "$scriptpath" "$core" "$@"
@@ -103,13 +106,28 @@ EOF
 		$lisp $lisp_flags "$scriptpath" -- "$core" "$@"
 		;;
 	esac
+}
+
+if [ ! -f "$core" ]; then
+	gencore "$@"
 fi
+
+if [ -f "$core" ]; then
+	## We can't `exec' here because we need to check for errors.
+	$lisp $image_flag "$core" && exit 0
+else
+	echo >&2 "Error generating image."
+	exit $error_generation
+fi
+
+echo >&2 "Image could not be loaded, maybe it was generated with a different compiler?  Trying again."
+gencore "$@"
 
 if [ -f "$core" ]; then
 	exec $lisp $image_flag "$core"
 else
 	echo >&2 "Error generating image."
-	exit 1
+	exit $error_generation
 fi
 
 |#
