@@ -66,12 +66,19 @@ loading UIOP or reimplementing it, which would be too slow.
 The POSIX shell code depends on standard Unix tools and does the image checking
 job in just a few lines.
 
-** Why hashing the binary?
+** How do we deal with core compatibility?
 
 Some implementations like SBCL refuse to load a core that wasn't created with
 the exact same compiler.  Since it's possible to have different compilers with
 the same version (e.g. when compiling them with different flags), checking
 against the version is not enough.
+
+One approach would be to compare the hash of the executable, but
+
+1. the core is not necessarily in the executable file;
+2. it's too slow.
+
+Our technique for now is to try once to rebuild the core on load failure.
 
 * References
 
