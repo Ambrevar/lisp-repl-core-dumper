@@ -40,6 +40,10 @@ Options:
   -f: Force rebuild the image.  This is useful for instance if you've updated
       the systems.
 
+  -g FLAGS: Command line arguments to pass to the Lisp when generating the image.
+
+  -s FLAGS: Command line arguments to pass to the Lisp when starting from the image.
+
   -v: Show version and exit.
 
 The image is only created for one of the following reasons:
@@ -55,7 +59,9 @@ EOF
 
 opt_force=false
 opt_clear_asdf=false
-while getopts ":chfv" opt; do
+opt_user_gen_flags=""
+opt_user_start_flags=""
+while getopts ":chfg:s:uv" opt; do
 	case $opt in
 	c)
 		opt_clear_asdf=true ;;
@@ -64,6 +70,10 @@ while getopts ":chfv" opt; do
 		exit 0 ;;
 	f)
 		opt_force=true ;;
+	g)
+		opt_user_gen_flags="$OPTARG" ;;
+	s)
+		opt_user_start_flags="$OPTARG" ;;
 	v)
 		echo $version
 		exit 0 ;;
@@ -121,7 +131,7 @@ gencore () {
 		## - The user init is important to support user setups like Quicklisp.
 		## - The debugger is important to avoid exitting the REPL on error.
 		## We load the file manually instead.
-		$lisp $eval_flag \
+		$lisp $opt_user_gen_flags $eval_flag \
 					"$(cat<<EOF
 (with-open-file (s "$scriptpath")
   (read-line s)
@@ -133,7 +143,7 @@ EOF
 		## It seems that CCL cannot load files with shabangs and
 		##   (progn (read-line s) (load s))
 		## does not seem to work.
-		$lisp $eval_flag \
+		$lisp $opt_user_gen_flags $eval_flag \
 					"$(cat<<EOF
 (with-open-file (s "$scriptpath")
   (read-line s)
@@ -149,7 +159,7 @@ EOF
 						)" -- "$core" "$@"
 		;;
 	clisp)
-		$lisp "$scriptpath" -- "$core" "$@"
+		$lisp $opt_user_gen_flags "$scriptpath" -- "$core" "$@"
 		;;
 	esac
 	## Newline for clearer output.
@@ -164,7 +174,7 @@ if [ -f "$core" ]; then
 	## We can't `exec' here because we need to check for errors.
 	echo >&2 "Loading '$core'."
 	startup_time=$(date +%s)
-	$lisp $image_flag "$core" && exit 0
+	$lisp $opt_user_start_flags $image_flag "$core" && exit 0
 	end_time=$(date +%s)
 	## If the image failed to load, it probably took less than a second.
 	## TODO: This is brittle, e.g. what if an error is raised before that?
@@ -183,7 +193,7 @@ gencore "$@"
 
 if [ -f "$core" ]; then
 	echo >&2 "Loading '$core'."
-	exec $lisp $image_flag "$core"
+	exec $lisp $opt_user_start_flags $image_flag "$core"
 else
 	echo >&2 "Error generating image."
 	exit $error_generation
