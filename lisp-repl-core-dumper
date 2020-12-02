@@ -143,6 +143,8 @@ EOF
 		$lisp "$scriptpath" -- "$core" "$@"
 		;;
 	esac
+	## Newline for clearer output.
+	echo
 }
 
 if $opt_force || [ ! -f "$core" ]; then
@@ -151,6 +153,7 @@ fi
 
 if [ -f "$core" ]; then
 	## We can't `exec' here because we need to check for errors.
+	echo >&2 "Loading '$core'."
 	$lisp $image_flag "$core" && exit 0
 else
 	echo >&2 "Error generating image."
@@ -161,6 +164,7 @@ echo >&2 "Image could not be loaded, maybe it was generated with a different com
 gencore "$@"
 
 if [ -f "$core" ]; then
+	echo >&2 "Loading '$core'."
 	exec $lisp $image_flag "$core"
 else
 	echo >&2 "Error generating image."
