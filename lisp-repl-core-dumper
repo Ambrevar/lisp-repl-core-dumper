@@ -178,7 +178,7 @@ fi
 (defvar default-packages
   (append
    #+sbcl
-   '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2 )
+   '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2)
    '(asdf)))
 
 (defvar core (first (uiop:command-line-arguments)))
