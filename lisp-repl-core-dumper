@@ -100,8 +100,9 @@ clisp)
 	image_flag=-M
 	;;
 	*)
-		echo >&2 "Unsupported '$lisp' implementation."
-		exit $error_unsupported_lisp;;
+		echo >&2 "Unsupported '$lisp' implementation, falling back to original executable."
+		exec "$lisp"
+		;;
 esac
 
 ## TODO: Include tests here?
