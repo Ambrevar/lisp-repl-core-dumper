@@ -116,9 +116,11 @@ gencore () {
 	$opt_clear_asdf && export LISP_REPL_CLEAR_ASDF=true
 	case "$lisp_basename" in
 	sbcl)
-		## --script disables the initfile, so we need to explicitly ask to load it
-		## --if we want to support user setups like Quicklisp.
-		$lisp --load ~/.sbclrc --script "$scriptpath" "$core" "$@"
+		## `--script' is useful to skip the #! line but it disables the userinit and
+		## the debugger, so we need to reenable them explicitly.
+		## - The userinit is important to support user setups like Quicklisp.
+		## - The debugger is important to avoid exitting the REPL on error.
+		$lisp --load ~/.sbclrc $eval_flag '(sb-ext:enable-debugger)' --script "$scriptpath" "$core" "$@"
 		;;
 	ccl)
 		## It seems that CCL cannot load files with shabangs and
