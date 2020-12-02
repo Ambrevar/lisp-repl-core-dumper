@@ -17,8 +17,8 @@
 
 version="0.1.0"
 
-XDG_CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache/}
-LISP_REPL_CORE_PATH=${LISP_REPL_CORE_PATH:-$XDG_CACHE_HOME/lisp-repl-core-directory/}
+XDG_CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache}
+LISP_REPL_CORE_PATH=${LISP_REPL_CORE_PATH:-$XDG_CACHE_HOME/lisp-repl-core-directory}
 
 error_args=1
 error_unsupported_lisp=2
