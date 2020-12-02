@@ -85,17 +85,17 @@ packages=$(echo "$@" | sed 's/ /\n/g' | sort | paste -sd '+' -)
 
 case "$lisp_basename" in
 sbcl)
-	lisp_flags="--noinform --no-userinit"
+	version_flags="--noinform --no-userinit"
 	eval_flag=--eval
 	image_flag=--core
 	;;
 ccl)
-	lisp_flags=--no-init
+	version_flags=--no-init
 	eval_flag=--eval
 	image_flag=--image-name
 	;;
 clisp)
-	lisp_flags="-norc --quiet"
+	version_flags="-norc --quiet"
 	eval_flag=-x
 	image_flag=-M
 	;;
@@ -109,7 +109,7 @@ esac
 
 ## Wrap result with (progn ... (values)) because CLISP outputs `-x` evalutions
 ## to stdout.
-version=$("$lisp" $lisp_flags $eval_flag '(progn (princ (lisp-implementation-version)) (values))' $eval_flag '(quit)')
+version=$("$lisp" $version_flags $eval_flag '(progn (princ (lisp-implementation-version)) (values))' $eval_flag '(quit)')
 core="$LISP_REPL_CORE_PATH"/$lisp_basename-$version$packages.image
 
 gencore () {
