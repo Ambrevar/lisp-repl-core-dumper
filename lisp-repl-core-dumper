@@ -163,7 +163,16 @@ fi
 if [ -f "$core" ]; then
 	## We can't `exec' here because we need to check for errors.
 	echo >&2 "Loading '$core'."
+	startup_time=$(date +%s)
 	$lisp $image_flag "$core" && exit 0
+	end_time=$(date +%s)
+	## If the image failed to load, it probably took less than a second.
+	## TODO: This is brittle, e.g. what if an error is raised before that?
+	## It can happen if debugger is disabled, which should not be the case since
+	## this script is meant to be a REPL wrapper.
+	if [ $(($end_time - $startup_time)) -gt 1 ]; then
+		 exit 0
+	fi
 else
 	echo >&2 "Error generating image."
 	exit $error_generation
