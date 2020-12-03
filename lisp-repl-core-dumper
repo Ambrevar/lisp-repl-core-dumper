@@ -28,12 +28,12 @@ usage () {
 	cat<<EOF>&2
 Usage: ${0##*/} LISP [SYSTEMS]
 
-Create a Lisp image with ASDF and SYSTEMS preloaded, then run LISP using this
+Create a Lisp executable image with ASDF and SYSTEMS preloaded, then run this
 image.
 
 Options:
 
-  -c: Clear ASDF configuration on image load.  This slows down startup a little
+  -c: Clear ASDF configuration on image start.  This slows down startup a little
       but without it you'd have to run '(asdf:clear-configuration)' to reflect
       changes made after the image generation.
 
@@ -42,7 +42,7 @@ Options:
 
   -g FLAGS: Command line arguments to pass to the Lisp when generating the image.
 
-  -s FLAGS: Command line arguments to pass to the Lisp when starting from the image.
+  -s FLAGS: Command line arguments to pass to the Lisp when starting the image.
 
   -v: Show version and exit.
 
@@ -97,17 +97,14 @@ case "$lisp_basename" in
 sbcl)
 	version_flags="--noinform --no-userinit"
 	eval_flag=--eval
-	image_flag=--core
 	;;
 ccl)
 	version_flags=--no-init
 	eval_flag=--eval
-	image_flag=--image-name
 	;;
 clisp)
 	version_flags="-norc --quiet"
 	eval_flag=-x
-	image_flag=-M
 	;;
 	*)
 		echo >&2 "Unsupported '$lisp' implementation, falling back to original executable."
@@ -172,28 +169,8 @@ fi
 
 if [ -f "$core" ]; then
 	## We can't `exec' here because we need to check for errors.
-	echo >&2 "Loading '$core'."
-	startup_time=$(date +%s)
-	$lisp $opt_user_start_flags $image_flag "$core" && exit 0
-	end_time=$(date +%s)
-	## If the image failed to load, it probably took less than a second.
-	## TODO: This is brittle, e.g. what if an error is raised before that?
-	## It can happen if debugger is disabled, which should not be the case since
-	## this script is meant to be a REPL wrapper.
-	if [ $(($end_time - $startup_time)) -gt 1 ]; then
-		 exit 0
-	fi
-else
-	echo >&2 "Error generating image."
-	exit $error_generation
-fi
-
-echo >&2 "Image could not be loaded, maybe it was generated with a different compiler?  Trying again."
-gencore "$@"
-
-if [ -f "$core" ]; then
-	echo >&2 "Loading '$core'."
-	exec $lisp $opt_user_start_flags $image_flag "$core"
+	echo >&2 "Running '$core'."
+	exec "$core" $opt_user_start_flags
 else
 	echo >&2 "Error generating image."
 	exit $error_generation
@@ -224,12 +201,7 @@ fi
 (mapc #'require default-packages)
 (mapc #'asdf:load-system extra-packages)
 
-(format *error-output* "Dumping ~s version ~s~a.~%"
-        core
-        (lisp-implementation-version)
-        (if extra-packages
-            (format nil " with packages ~a" extra-packages)
-            ""))
+(format *error-output* "Dumping...~%")
 (finish-output *error-output*)
 (format t "~a~%" core)
 (finish-output)
@@ -255,6 +227,6 @@ fi
                                   :quiet t
                                   :start-package *package*
                                   :keep-global-handlers nil
-                                  :executable nil))))
+                                  :executable t))))
     ;; CLISP does not quit after dumping an image.
     (ext:quit 0)))
