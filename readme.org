@@ -103,6 +103,12 @@ distinguish between image load errors and other errors?)
 
 It's just simpler to generate a stand-alone image!
 
+* Change log
+
+** 0.4.0
+
+- Pass packages via the -p option and start-flags via positional arguments.
+
 * References
 
 hu.dwim has a a similar, more sophisticated, but less general script:
