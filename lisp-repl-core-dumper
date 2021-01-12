@@ -1,6 +1,6 @@
 #!/bin/sh
 #| -*- mode: lisp; -*-
-## Copyright (C) 2020 Pierre Neidhardt <mail@ambrevar.xyz>
+## Copyright (C) 2020, 2021 Pierre Neidhardt <mail@ambrevar.xyz>
 ##
 ## This program is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -25,10 +25,10 @@ error_generation=2
 
 usage () {
 	cat<<EOF>&2
-Usage: ${0##*/} LISP [SYSTEMS]
+Usage: ${0##*/} LISP [START-FLAGS]
 
-Create a Lisp executable image with ASDF and SYSTEMS preloaded, then run this
-image.
+Create (if necessary) a Lisp executable image with ASDF preloaded, then run this
+image and pass it START-FLAGS.
 
 Options:
 
@@ -39,9 +39,12 @@ Options:
   -f: Force rebuild the image.  This is useful for instance if you've updated
       the systems.
 
-  -g FLAGS: Command line arguments to pass to the Lisp when generating the image.
+  -g FLAGS: Command line arguments to pass to the Lisp when generating the
+            image.  Instead of evaluating Lisp directly from the flags
+            (e.g. with --eval), it's recommended to load a Lisp file containing
+            the desired code.
 
-  -s FLAGS: Command line arguments to pass to the Lisp when starting the image.
+  -p PACKAGES: Preload the whitespace-separated list of packages into the image.
 
   -v: Show version and exit.
 
@@ -59,8 +62,8 @@ EOF
 opt_force=false
 opt_clear_asdf=false
 opt_user_gen_flags=""
-opt_user_start_flags=""
-while getopts ":chfg:s:uv" opt; do
+opt_user_packages=""
+while getopts ":chfg:p:uv" opt; do
 	case $opt in
 	c)
 		opt_clear_asdf=true ;;
@@ -71,8 +74,12 @@ while getopts ":chfg:s:uv" opt; do
 		opt_force=true ;;
 	g)
 		opt_user_gen_flags="$OPTARG" ;;
-	s)
-		opt_user_start_flags="$OPTARG" ;;
+	p)
+		if [ -z "$opt_user_packages" ]; then
+			opt_user_packages="$OPTARG"
+		else
+			opt_user_packages="$opt_user_packages $OPTARG"
+		fi ;;
 	v)
 		echo $version
 		exit 0 ;;
@@ -89,7 +96,7 @@ scriptpath=$0
 lisp=$1
 lisp_basename=$(basename "$lisp")
 shift 1
-packages=$(echo "$@" | sed 's/ /\n/g' | sort | paste -sd '+' -)
+packages=$(echo "$opt_user_packages" | sed 's/ /\n/g' | sort | paste -sd '+' -)
 [ -n "$packages" ] && packages=-"$packages"
 
 case "$lisp_basename" in
@@ -163,13 +170,14 @@ EOF
 }
 
 if $opt_force || [ ! -f "$core" ]; then
-	gencore "$@"
+	## We intentionally unquote $opt_user_packages so that they are word-splitted.
+	gencore $opt_user_packages
 fi
 
 if [ -f "$core" ]; then
 	## We can't `exec' here because we need to check for errors.
 	echo >&2 "Running '$core'."
-	exec "$core" $opt_user_start_flags
+	exec "$core" "$@"
 else
 	echo >&2 "Error generating image."
 	exit $error_generation
