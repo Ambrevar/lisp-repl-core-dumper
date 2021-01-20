@@ -189,7 +189,9 @@ fi
 
 (let ((default-packages (append
                          #+sbcl
-                         '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2)
+                         ;; sb-rotate-byte is required by cl-utilities, and if
+                         ;; we don't include it reloading cl-utilities may fail.
+                         '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2 sb-rotate-byte)
                          '(asdf)))
       (core (first (uiop:command-line-arguments)))
       (extra-packages (rest (uiop:command-line-arguments))))
