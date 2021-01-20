@@ -105,6 +105,14 @@ It's just simpler to generate a stand-alone image!
 
 * Change log
 
+** 0.5.0
+
+- Fix issue with missing lisp-repl-core-dumper package.
+  No such package is created anymore.
+
+- Fix issue with sb-rorate-byte missing when reloading systems that depend on it
+  (like cl-utilities).
+
 ** 0.4.0
 
 - Pass packages via the -p option and start-flags via positional arguments.
