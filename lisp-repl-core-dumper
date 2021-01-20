@@ -185,43 +185,30 @@ fi
 
 |#
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defpackage lisp-repl-core-dumper
-  (:use #:common-lisp))
-(in-package lisp-repl-core-dumper)
-
 (require "asdf")
 
-(defvar default-packages
-  (append
-   #+sbcl
-   '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2)
-   '(asdf)))
+(let ((default-packages (append
+                         #+sbcl
+                         '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2)
+                         '(asdf)))
+      (core (first (uiop:command-line-arguments)))
+      (extra-packages (rest (uiop:command-line-arguments))))
+  (mapc #'require default-packages)
+  (mapc #'asdf:load-system extra-packages)
 
-(defvar core (first (uiop:command-line-arguments)))
+  (format *error-output* "Dumping...~%")
+  (finish-output *error-output*)
+  (format t "~a~%" core)
+  (finish-output)
 
-(defvar extra-packages (rest (uiop:command-line-arguments)))
+  ;; `*image-dump-hook*' is `(UIOP/CONFIGURATION:CLEAR-CONFIGURATION)' by
+  ;; default, which slows down startup.
+  (unless (uiop:getenv "LISP_REPL_CLEAR_ASDF")
+    (setf uiop:*image-dump-hook* nil))
 
-(defun ensure-parent-exists (file)
   (uiop:ensure-all-directories-exist
-   (list (directory-namestring file))))
+   (list (directory-namestring core)))
 
-(mapc #'require default-packages)
-(mapc #'asdf:load-system extra-packages)
-
-(format *error-output* "Dumping...~%")
-(finish-output *error-output*)
-(format t "~a~%" core)
-(finish-output)
-
-;; `*image-dump-hook*' is `(UIOP/CONFIGURATION:CLEAR-CONFIGURATION)' by
-;; default, which slows down startup.
-(unless (uiop:getenv "LISP_REPL_CLEAR_ASDF")
-  (setf uiop:*image-dump-hook* nil))
-(ensure-parent-exists core)
-
-(in-package cl-user)
-(let ((core lisp-repl-core-dumper::core))
-  (delete-package :lisp-repl-core-dumper)
   #-clisp
   (uiop:dump-image core)
   #+clisp
