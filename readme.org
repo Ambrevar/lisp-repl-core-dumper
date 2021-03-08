@@ -105,6 +105,10 @@ It's just simpler to generate a stand-alone image!
 
 * Change log
 
+** 0.6.0
+
+- Add -o option to specify the output path.
+
 ** 0.5.0
 
 - Fix issue with missing lisp-repl-core-dumper package.
