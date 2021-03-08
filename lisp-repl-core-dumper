@@ -25,7 +25,7 @@ error_generation=2
 
 usage () {
 	cat<<EOF>&2
-Usage: ${0##*/} LISP [START-FLAGS]
+Usage: ${0##*/} [OPTIONS] LISP [START-FLAGS]
 
 Create (if necessary) a Lisp executable image with ASDF preloaded, then run this
 image and pass it START-FLAGS.
@@ -43,6 +43,8 @@ Options:
             image.  Instead of evaluating Lisp directly from the flags
             (e.g. with --eval), it's recommended to load a Lisp file containing
             the desired code.
+
+  -o OUTPUT: Path the the result image.
 
   -p PACKAGES: Preload the whitespace-separated list of packages into the image.
 
@@ -63,7 +65,8 @@ opt_force=false
 opt_clear_asdf=false
 opt_user_gen_flags=""
 opt_user_packages=""
-while getopts ":chfg:p:uv" opt; do
+core=""
+while getopts ":chfg:o:p:uv" opt; do
 	case $opt in
 	c)
 		opt_clear_asdf=true ;;
@@ -74,6 +77,8 @@ while getopts ":chfg:p:uv" opt; do
 		opt_force=true ;;
 	g)
 		opt_user_gen_flags="$OPTARG" ;;
+	o)
+		core="$OPTARG" ;;
 	p)
 		if [ -z "$opt_user_packages" ]; then
 			opt_user_packages="$OPTARG"
@@ -123,7 +128,7 @@ esac
 ## Wrap result with (progn ... (values)) because CLISP outputs `-x` evalutions
 ## to stdout.
 version=$("$lisp" $version_flags $eval_flag '(progn (princ (lisp-implementation-version)) (values))' $eval_flag '(quit)')
-core="$LISP_REPL_CORE_PATH"/$lisp_basename-$version$packages.image
+[ -z "$core" ] && core="$LISP_REPL_CORE_PATH"/$lisp_basename-$version$packages.image
 
 gencore () {
 	$opt_clear_asdf && export LISP_REPL_CLEAR_ASDF=true
