@@ -46,7 +46,7 @@ Options:
 
   -o OUTPUT: Path the the result image.
 
-  -p PACKAGES: Preload the whitespace-separated list of packages into the image.
+  -s SYSTEMS: Preload the whitespace-separated list of systems into the image.
 
   -v: Show version and exit.
 
@@ -64,9 +64,9 @@ EOF
 opt_force=false
 opt_clear_asdf=false
 opt_user_gen_flags=""
-opt_user_packages=""
+opt_user_systems=""
 core=""
-while getopts ":chfg:o:p:uv" opt; do
+while getopts ":chfg:o:s:uv" opt; do
 	case $opt in
 	c)
 		opt_clear_asdf=true ;;
@@ -79,11 +79,11 @@ while getopts ":chfg:o:p:uv" opt; do
 		opt_user_gen_flags="$OPTARG" ;;
 	o)
 		core="$OPTARG" ;;
-	p)
-		if [ -z "$opt_user_packages" ]; then
-			opt_user_packages="$OPTARG"
+	s)
+		if [ -z "$opt_user_systems" ]; then
+			opt_user_systems="$OPTARG"
 		else
-			opt_user_packages="$opt_user_packages $OPTARG"
+			opt_user_systems="$opt_user_systems $OPTARG"
 		fi ;;
 	v)
 		echo $version
@@ -101,8 +101,8 @@ scriptpath=$0
 lisp=$1
 lisp_basename=$(basename "$lisp")
 shift 1
-packages=$(echo "$opt_user_packages" | sed 's/ /\n/g' | sort | paste -sd '+' -)
-[ -n "$packages" ] && packages=-"$packages"
+systems=$(echo "$opt_user_systems" | sed 's/ /\n/g' | sort | paste -sd '+' -)
+[ -n "$systems" ] && systems=-"$systems"
 
 case "$lisp_basename" in
 sbcl)
@@ -128,7 +128,7 @@ esac
 ## Wrap result with (progn ... (values)) because CLISP outputs `-x` evalutions
 ## to stdout.
 version=$("$lisp" $version_flags $eval_flag '(progn (princ (lisp-implementation-version)) (values))' $eval_flag '(quit)')
-[ -z "$core" ] && core="$LISP_REPL_CORE_PATH"/$lisp_basename-$version$packages.image
+[ -z "$core" ] && core="$LISP_REPL_CORE_PATH"/$lisp_basename-$version$systems.image
 
 gencore () {
 	$opt_clear_asdf && export LISP_REPL_CLEAR_ASDF=true
@@ -175,8 +175,8 @@ EOF
 }
 
 if $opt_force || [ ! -f "$core" ]; then
-	## We intentionally unquote $opt_user_packages so that they are word-splitted.
-	gencore $opt_user_packages
+	## We intentionally unquote $opt_user_systems so that they are word-splitted.
+	gencore $opt_user_systems
 fi
 
 if [ -f "$core" ]; then
@@ -192,16 +192,16 @@ fi
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (require "asdf")
 
-(let ((default-packages (append
-                         #+sbcl
-                         ;; sb-rotate-byte is required by cl-utilities, and if
-                         ;; we don't include it reloading cl-utilities may fail.
-                         '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2 sb-rotate-byte)
-                         '(asdf)))
+(let ((default-systems (append
+                        #+sbcl
+                        ;; sb-rotate-byte is required by cl-utilities, and if
+                        ;; we don't include it reloading cl-utilities may fail.
+                        '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2 sb-rotate-byte)
+                        '(asdf)))
       (core (first (uiop:command-line-arguments)))
-      (extra-packages (rest (uiop:command-line-arguments))))
-  (mapc #'require default-packages)
-  (mapc #'asdf:load-system extra-packages)
+      (extra-systems (rest (uiop:command-line-arguments))))
+  (mapc #'require default-systems)
+  (mapc #'asdf:load-system extra-systems)
 
   (format *error-output* "Dumping...~%")
   (finish-output *error-output*)
