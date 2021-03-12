@@ -36,6 +36,10 @@ Options:
       but without it you'd have to run '(asdf:clear-configuration)' to reflect
       changes made after the image generation.
 
+  -d SYSTEMS: Preload the systems that SYSTEMS depend on.
+              This is useful to build an environment to work on SYSTEMS themselves.
+              Can be specified multiple times.
+
   -f: Force rebuild the image.  This is useful for instance if you've updated
       the systems.
 
@@ -47,6 +51,7 @@ Options:
   -o OUTPUT: Path the the result image.
 
   -s SYSTEMS: Preload the whitespace-separated list of systems into the image.
+              Can be specified multiple times.
 
   -v: Show version and exit.
 
@@ -66,10 +71,17 @@ opt_clear_asdf=false
 opt_user_gen_flags=""
 opt_user_systems=""
 core=""
-while getopts ":chfg:o:s:uv" opt; do
+while getopts ":cd:hfg:o:s:uv" opt; do
 	case $opt in
 	c)
 		opt_clear_asdf=true ;;
+	d)
+		if [ -z "$opt_dep_systems" ]; then
+			opt_dep_systems="$OPTARG"
+		else
+			opt_dep_systems="$opt_dep_systems $OPTARG"
+		fi ;;
+
 	h)
 		usage
 		exit 0 ;;
@@ -103,6 +115,8 @@ lisp_basename=$(basename "$lisp")
 shift 1
 systems=$(echo "$opt_user_systems" | sed 's/ /\n/g' | sort | paste -sd '+' -)
 [ -n "$systems" ] && systems=-"$systems"
+dep_systems=$(echo "$opt_dep_systems" | sed 's/ /\n/g' | sort | paste -sd '+' -)
+[ -n "$dep_systems" ] && systems="$systems--$dep_systems"
 
 case "$lisp_basename" in
 sbcl)
@@ -175,8 +189,7 @@ EOF
 }
 
 if $opt_force || [ ! -f "$core" ]; then
-	## We intentionally unquote $opt_user_systems so that they are word-splitted.
-	gencore $opt_user_systems
+	gencore "$opt_user_systems" "$opt_dep_systems"
 fi
 
 if [ -f "$core" ]; then
@@ -192,42 +205,82 @@ fi
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (require "asdf")
 
-(let ((default-systems (append
-                        #+sbcl
-                        ;; sb-rotate-byte is required by cl-utilities, and if
-                        ;; we don't include it reloading cl-utilities may fail.
-                        '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2 sb-rotate-byte)
-                        '(asdf)))
-      (core (first (uiop:command-line-arguments)))
-      (extra-systems (rest (uiop:command-line-arguments))))
-  (mapc #'require default-systems)
-  (mapc #'asdf:load-system extra-systems)
+(flet ((string->sym-seq (str)
+         (with-input-from-string (s str)
+           (loop for x = (read s nil :eof)
+                 until (eq x :eof)
+                 collect x)))
+       (derive-dependencies (system)
+             (let ((sys-dir (uiop:pathname-directory-pathname
+                             (asdf:system-source-file system))))
+               (labels ((sys-subdir? (dep)
+                          (uiop:subpathp (uiop:pathname-directory-pathname
+                                          (asdf:system-source-file dep))
+                                         sys-dir))
+                        (expand-external-deps (deps)
+                          (when deps
+                            (let ((dep (first deps)))
+                              (if (sys-subdir? dep)
+                                  (expand-external-deps
+                                   (append (rest deps)
+                                           (asdf:system-depends-on (asdf:find-system dep))))
+                                  (cons dep (expand-external-deps (rest deps))))))))
+                 (remove-duplicates (expand-external-deps (list system)) :test #'string=)))))
+  (let* ((default-systems (append
+                           #+sbcl
+                           ;; sb-rotate-byte is required by cl-utilities, and if
+                           ;; we don't include it reloading cl-utilities may fail.
+                           '(sb-bsd-sockets sb-posix sb-introspect sb-cltl2 sb-rotate-byte)
+                           '(asdf)))
+         (core (first (uiop:command-line-arguments)))
+         (extra-systems (string->sym-seq
+                         (first (rest (uiop:command-line-arguments)))))
+         (dependencies-of-systems (string->sym-seq
+                                   (second (rest (uiop:command-line-arguments)))))
+         (dependencies (apply #'append
+                              (mapcar #'derive-dependencies dependencies-of-systems))))
 
-  (format *error-output* "Dumping...~%")
-  (finish-output *error-output*)
-  (format t "~a~%" core)
-  (finish-output)
+    (mapc #'require default-systems)
+    (mapc #'asdf:load-system extra-systems)
+    (mapc #'asdf:load-system dependencies)
 
-  ;; `*image-dump-hook*' is `(UIOP/CONFIGURATION:CLEAR-CONFIGURATION)' by
-  ;; default, which slows down startup.
-  (unless (uiop:getenv "LISP_REPL_CLEAR_ASDF")
-    (setf uiop:*image-dump-hook* nil))
 
-  (uiop:ensure-all-directories-exist
-   (list (directory-namestring core)))
+    (finish-output)
+    (finish-output *error-output*)
+    (format *error-output* "~%~%Dumping preloaded systems:~%")
+    (format *error-output* "- Default: ~a~%" default-systems)
+    (when extra-systems
+      (format *error-output* "- Users: ~a~%" extra-systems))
+    (when dependencies-of-systems
+      (format *error-output* "- Dependencies of ~a:~%~2t~a~%"
+              dependencies-of-systems
+              (mapcar #'string-upcase dependencies)))
+    (format *error-output* "into image:~%")
+    (format *error-output* "~s~%" core)
+    (format *error-output* "...~%~%")
+    (finish-output *error-output*)
+    (finish-output)
 
-  #-clisp
-  (uiop:dump-image core)
-  #+clisp
-  (progn
-    ;; CLISP image saving is too verbose.
-    (funcall (read-from-string "uiop:call-with-null-output")
-             (lambda (null-output)
-               (let ((*standard-output* null-output))
-                 (ext:saveinitmem core
-                                  :quiet t
-                                  :start-package *package*
-                                  :keep-global-handlers nil
-                                  :executable t))))
-    ;; CLISP does not quit after dumping an image.
-    (ext:quit 0)))
+    ;; `*image-dump-hook*' is `(UIOP/CONFIGURATION:CLEAR-CONFIGURATION)' by
+    ;; default, which slows down startup.
+    (unless (uiop:getenv "LISP_REPL_CLEAR_ASDF")
+      (setf uiop:*image-dump-hook* nil))
+
+    (uiop:ensure-all-directories-exist
+     (list (directory-namestring core)))
+
+    #-clisp
+    (uiop:dump-image core)
+    #+clisp
+    (progn
+      ;; CLISP image saving is too verbose.
+      (funcall (read-from-string "uiop:call-with-null-output")
+               (lambda (null-output)
+                 (let ((*standard-output* null-output))
+                   (ext:saveinitmem core
+                                    :quiet t
+                                    :start-package *package*
+                                    :keep-global-handlers nil
+                                    :executable t))))
+      ;; CLISP does not quit after dumping an image.
+      (ext:quit 0))))
