@@ -64,16 +64,14 @@ image dumping.
 While this can be used with any editor, here is a configuration snippet for
 Emacs user to save them some typing.
 
-This configuration sample makes use of the ability to accept lambdas as Lisp
-implementation.  This way we call the dumper on each inferior Lisp startup.
-
 #+begin_src elisp
   (let ((dumper "/path/to/lisp-repl-core-dumper"))
     (setq sly-lisp-implementations
           `((ccl (,dumper "ccl"))
             (ccl-with-alex (,dumper "ccl" "alexandria"))
             (clisp (,dumper "clisp"))
-            (sbcl (,dumper "sbcl")))))
+            (sbcl (,dumper "sbcl"))
+            (sbcl-for-nyxt (,dumper "-d" "nyxt/gtk" "sbcl")))))
 #+end_src
 
 or, if =lisp-repl-core-dumper= is in your path:
@@ -84,6 +82,7 @@ or, if =lisp-repl-core-dumper= is in your path:
           (ccl-with-alex ("lisp-repl-core-dumper" "ccl" "alexandria"))
           (clisp ("lisp-repl-core-dumper" "clisp"))
           (sbcl ("lisp-repl-core-dumper" "sbcl"))))
+          (sbcl-for-nyxt ("lisp-repl-core-dumper" "-d" "nyxt/gtk" "sbcl"))))
 #+end_src
 
 * Implementation notes
