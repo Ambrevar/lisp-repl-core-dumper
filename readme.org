@@ -32,8 +32,23 @@ Example use:
 lisp-repl-core-dumper -p 'alexandria serapeum' sbcl
 #+end_src
 
-will generate an image (if necessary), including Alexandria and Serapeum, then
-drop you in the resulting REPL.
+generates an image (if necessary), including Alexandria and Serapeum, then
+drops you in the resulting REPL.
+
+#+begin_src sh
+lisp-repl-core-dumper -p alexandria -d serapeum sbcl
+#+end_src
+
+As above, this generates an image that includes Alexadrian and all the
+/dependencies/ of Serapeum, but not Serapeum itself.
+
+From the REPL, call
+
+#+begin_src lisp
+(asdf:already-loaded-systems)
+#+end_src
+
+to list all pre-loaded systems.
 
 * Tested compilers
 
@@ -80,7 +95,7 @@ or, if =lisp-repl-core-dumper= is in your path:
 The time spent checking for an up-to-date image adds further delay before
 the REPL is usable, so we want to make it the fastest possible.
 
-We could have programmed it fully in Lisp, but then we would have need a
+We could have programmed it fully in Lisp, but then we would have needed a
 portable way to interact with files, run a program, etc.  Which would amount to
 loading UIOP or reimplementing it, which would be too slow.
 
