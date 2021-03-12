@@ -15,7 +15,7 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-version="0.6.0"
+version="0.7.0"
 
 XDG_CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache}
 LISP_REPL_CORE_PATH=${LISP_REPL_CORE_PATH:-$XDG_CACHE_HOME/lisp-repl-core-directory}

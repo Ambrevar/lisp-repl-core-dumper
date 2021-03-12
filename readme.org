@@ -120,6 +120,11 @@ It's just simpler to generate a stand-alone image!
 
 * Change log
 
+** 0.7.0
+
+- Add -d option to preload system /dependencies/.
+- Rename -p option to -s.
+
 ** 0.6.0
 
 - Add -o option to specify the output path.
