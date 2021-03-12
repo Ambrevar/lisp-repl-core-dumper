@@ -29,14 +29,14 @@ See =lisp-repl-core-dumper -h=.
 Example use:
 
 #+begin_src sh
-lisp-repl-core-dumper -p 'alexandria serapeum' sbcl
+lisp-repl-core-dumper -s 'alexandria serapeum' sbcl
 #+end_src
 
 generates an image (if necessary), including Alexandria and Serapeum, then
 drops you in the resulting REPL.
 
 #+begin_src sh
-lisp-repl-core-dumper -p alexandria -d serapeum sbcl
+lisp-repl-core-dumper -s alexandria -d serapeum sbcl
 #+end_src
 
 As above, this generates an image that includes Alexadrian and all the
